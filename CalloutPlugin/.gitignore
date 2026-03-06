@@ -1,0 +1,11 @@
+## .gitignore for CalloutPlugin
+bin/
+obj/
+.vs/
+*.user
+*.suo
+packages/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store

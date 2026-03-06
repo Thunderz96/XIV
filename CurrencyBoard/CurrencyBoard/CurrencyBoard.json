@@ -1,0 +1,8 @@
+{
+  "Name": "Currency & Progression Board",
+  "Author": "Thunderz96",
+  "Punchline": "All your currencies, caps, and progression goals in one HUD.",
+  "Description": "Track Gil, Tomestones, weekly caps, beast tribe reputation, and custom progression goals in a single, always-visible overlay. Use /currboard to toggle the display, /currboard config to open settings.",
+  "RepoUrl": "https://github.com/Thunderz96/CurrencyBoard",
+  "Tags": [ "currency", "tracker", "hud", "overlay", "progression", "tomestones", "ui" ]
+}

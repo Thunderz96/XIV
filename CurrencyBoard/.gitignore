@@ -1,0 +1,22 @@
+## .gitignore for CurrencyBoard
+## Tells Git which files to NOT track (build outputs, IDE files, etc.)
+
+# Build outputs
+bin/
+obj/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+
+# NuGet packages (restored automatically from lock file)
+packages/
+
+# Rider IDE
+.idea/
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store

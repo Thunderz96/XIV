@@ -1,0 +1,119 @@
+<!--
+  CurrencyBoard.csproj — Project Configuration File
+  ==================================================
+  
+  This is the C# equivalent of a Makefile or CMakeLists.txt. It tells the 
+  .NET build system (MSBuild) how to compile your project, what dependencies 
+  to pull in, and how to package the result.
+  
+  KEY CONCEPTS FOR PYTHON/C++ DEVELOPERS:
+  - <PropertyGroup>  = Build settings (like compiler flags)
+  - <ItemGroup>      = File references and dependencies (like #include paths)
+  - NuGet packages   = Like pip packages or vcpkg — automatically downloaded
+  - $(DalamudLibPath)= Environment variable pointing to where Dalamud DLLs live
+                       (set automatically by XIVLauncher's dev environment)
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ===== BUILD SETTINGS ===== -->
+  <PropertyGroup>
+    <!-- Target .NET 10 — this is what Dalamud v14 runs on.
+         Think of this like choosing which Python version to use.
+         NOTE: Requires .NET 10 SDK 10.0.101+ installed. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    
+    <!-- FFXIV is a 64-bit application, so our plugin must be too -->
+    <Platforms>x64</Platforms>
+    
+    <!-- Suppresses a warning about Windows-only code. We're making an 
+         FFXIV plugin, so Windows-only is expected. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    
+    <!-- Enables newer C# language features (like 'required' keyword, 
+         pattern matching improvements, etc.) -->
+    <LangVersion>latest</LangVersion>
+    
+    <!-- Allow unsafe code blocks — needed for some game interop later.
+         Similar to allowing raw pointers in C++ (which you're familiar with!) -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    
+    <!-- Enable nullable reference type checking — helps catch null bugs at
+         compile time. The "?" after a type means "this can be null." -->
+    <Nullable>enable</Nullable>
+    
+    <!-- Don't bundle .NET runtime DLLs with our plugin — Dalamud already
+         provides them. This keeps our output small. -->
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    
+    <!-- Restore NuGet packages using a lock file for reproducible builds.
+         Like pip freeze > requirements.txt in Python. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    
+    <!-- Plugin metadata — used by DalamudPackager to generate the manifest.
+         With API 14+, you can put all this right here in the .csproj! -->
+    <PackageProjectUrl>https://github.com/YourName/CurrencyBoard</PackageProjectUrl>
+    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <IsPackable>false</IsPackable>
+    
+    <!-- Dalamud API level — MUST match your installed Dalamud version.
+         API 14 is the current version as of Dawntrail. -->
+    <DalamudApiLevel>14</DalamudApiLevel>
+  </PropertyGroup>
+
+  <!-- ===== DALAMUD SDK REFERENCES ===== -->
+  <!-- 
+    This is where we tell the compiler "here are the Dalamud DLLs to link against."
+    $(DalamudLibPath) is an environment variable that points to your local 
+    Dalamud installation. It's usually set automatically, but if not, it defaults
+    to the XIVLauncher addon directory.
+    
+    For C++ developers: this is like adding -I/path/to/headers and -L/path/to/libs
+    For Python developers: this is like adding a package to sys.path
+  -->
+  <PropertyGroup>
+    <DalamudLibPath>$(AppData)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
+  </PropertyGroup>
+
+  <!-- ===== NUGET PACKAGES ===== -->
+  <ItemGroup>
+    <!-- DalamudPackager: Automatically packages your plugin into the correct
+         format for distribution. Version must match your Dalamud API level.
+         API 14 = DalamudPackager 14.x -->
+    <PackageReference Include="DalamudPackager" Version="14.0.1" />
+  </ItemGroup>
+
+  <!-- ===== DALAMUD DLL REFERENCES ===== -->
+  <!-- 
+    These are the actual Dalamud libraries our code will call into.
+    Private="false" means "don't copy these into my output folder" because
+    Dalamud will already have them loaded in the game process.
+  -->
+  <ItemGroup>
+    <Reference Include="Dalamud">
+      <HintPath>$(DalamudLibPath)Dalamud.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Dalamud.Bindings.ImGui">
+      <HintPath>$(DalamudLibPath)Dalamud.Bindings.ImGui.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Lumina">
+      <HintPath>$(DalamudLibPath)Lumina.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Lumina.Excel">
+      <HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="FFXIVClientStructs">
+      <HintPath>$(DalamudLibPath)FFXIVClientStructs.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(DalamudLibPath)Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

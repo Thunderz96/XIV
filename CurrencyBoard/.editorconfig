@@ -1,0 +1,20 @@
+# EditorConfig — Defines consistent code formatting across editors.
+# Visual Studio, Rider, and VS Code all respect these settings.
+# This keeps your code style consistent even if you switch editors.
+
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.cs]
+# C# specific settings
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
