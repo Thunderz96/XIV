@@ -104,6 +104,13 @@ public class TimelineEngine : IDisposable
     /// <summary>The currently active timeline name (for display).</summary>
     public string? ActiveTimelineName => activeTimeline?.Name;
 
+    /// <summary>
+    /// Whether the currently loaded timeline has its Enabled flag set to true.
+    /// Used by the debug UI to show whether callouts would actually fire.
+    /// Returns false if no timeline is loaded.
+    /// </summary>
+    public bool ActiveTimelineEnabled => activeTimeline?.Enabled ?? false;
+
     // =========================================================================
     // CONSTRUCTOR
     // =========================================================================
@@ -131,12 +138,22 @@ public class TimelineEngine : IDisposable
     /// <summary>
     /// Sets the active timeline. Call this when the user selects a timeline,
     /// or when auto-detection loads one based on territory.
+    /// If the timeline is disabled, we still store the reference (so the UI
+    /// can show it as selected), but we stop the engine immediately.
     /// </summary>
     public void LoadTimeline(FightTimeline? timeline)
     {
         activeTimeline = timeline;
-        Reset();
-        Log.Info($"Timeline loaded: {timeline?.Name ?? "(none)"}");
+        Reset(); // Always reset — clears any previously running state
+
+        if (timeline != null && !timeline.Enabled)
+        {
+            Log.Info($"Timeline loaded but is DISABLED: {timeline.Name} — engine will not fire callouts.");
+        }
+        else
+        {
+            Log.Info($"Timeline loaded: {timeline?.Name ?? "(none)"}");
+        }
     }
 
     /// <summary>
@@ -152,9 +169,15 @@ public class TimelineEngine : IDisposable
 
     /// <summary>
     /// Manually start the timer (for testing or manual trigger via command).
+    /// Will not start if the active timeline is disabled.
     /// </summary>
     public void ManualStart()
     {
+        if (activeTimeline == null || !activeTimeline.Enabled)
+        {
+            Log.Warning("ManualStart called but active timeline is disabled or null — not starting.");
+            return;
+        }
         Reset();
         fightStopwatch.Start();
         OnCombatStarted?.Invoke(this, EventArgs.Empty);
@@ -184,12 +207,23 @@ public class TimelineEngine : IDisposable
         var isInCombat = Condition[ConditionFlag.InCombat];
 
         // Detect combat START (transition from not-in-combat → in-combat)
+        // Only actually start if we have an enabled timeline loaded.
+        // Without this check, the stopwatch would start and OnCombatStarted
+        // would fire even when the selected timeline is disabled, which could
+        // cause the overlay to react (e.g. clearing on combat end) unexpectedly.
         if (isInCombat && !wasInCombat)
         {
-            Reset();
-            fightStopwatch.Start();
-            OnCombatStarted?.Invoke(this, EventArgs.Empty);
-            Log.Debug("Combat started — timeline timer running.");
+            if (activeTimeline != null && activeTimeline.Enabled)
+            {
+                Reset();
+                fightStopwatch.Start();
+                OnCombatStarted?.Invoke(this, EventArgs.Empty);
+                Log.Debug("Combat started — timeline timer running.");
+            }
+            else
+            {
+                Log.Debug("Combat started but active timeline is disabled or null — not running.");
+            }
         }
         // Detect combat END (transition from in-combat → not-in-combat)
         else if (!isInCombat && wasInCombat)
@@ -202,7 +236,10 @@ public class TimelineEngine : IDisposable
         wasInCombat = isInCombat;
 
         // ---- Check Timeline Entries ----
-        if (!fightStopwatch.IsRunning || activeTimeline == null)
+        // Also check activeTimeline.Enabled here — the user can toggle a timeline
+        // off after it's already been loaded into the engine. Without this check,
+        // the engine would keep firing callouts even for a disabled timeline.
+        if (!fightStopwatch.IsRunning || activeTimeline == null || !activeTimeline.Enabled)
             return;
 
         var currentTime = CurrentTime;
@@ -219,8 +256,8 @@ public class TimelineEngine : IDisposable
                 bool roleMatch = entry.TargetRole switch
                 {
                     TargetRole.Tank => roleId == 1,
-                    TargetRole.Healer => roleId == 5, 
-                    TargetRole.DPS => roleId == 2 || roleId == 3 || roleId == 4, 
+                    TargetRole.Healer => roleId == 4, 
+                    TargetRole.DPS => roleId == 2 || roleId == 3, 
                     _ => true
                 };
 

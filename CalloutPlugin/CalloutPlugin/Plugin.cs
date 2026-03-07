@@ -34,7 +34,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly IDalamudPluginInterface PluginInterface;
     private readonly ICommandManager CommandManager;
     private readonly IPluginLog Log;
-    private readonly IClientState ClientState;
+    public readonly IClientState ClientState;
 
     // ---- Our Systems ----
     public readonly WindowSystem WindowSystem = new("CalloutPlugin");
@@ -72,6 +72,8 @@ public sealed class Plugin : IDalamudPlugin
     // ---- Windows ----
     private readonly MainWindow MainWindow;
     private readonly AlertOverlay AlertOverlay;
+    public readonly TimelineView TimelineView;
+    public readonly CooldownTracker CooldownTracker;
 
     private const string CommandName = "/callout";
 
@@ -115,11 +117,15 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         // Create windows
-        MainWindow = new MainWindow(this);
-        AlertOverlay = new AlertOverlay(this);
+        MainWindow     = new MainWindow(this);
+        AlertOverlay   = new AlertOverlay(this);
+        TimelineView   = new TimelineView(this);
+        CooldownTracker = new CooldownTracker(this);
 
         WindowSystem.AddWindow(MainWindow);
         WindowSystem.AddWindow(AlertOverlay);
+        WindowSystem.AddWindow(TimelineView);
+        WindowSystem.AddWindow(CooldownTracker);
 
         // Register commands
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
@@ -146,6 +152,8 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.RemoveAllWindows();
         MainWindow.Dispose();
         AlertOverlay.Dispose();
+        TimelineView.Dispose();
+        CooldownTracker.Dispose();
         Engine.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
@@ -195,6 +203,10 @@ public sealed class Plugin : IDalamudPlugin
 
             case "stop":
                 Engine.ManualStop();
+                break;
+
+            case "timeline":
+                TimelineView.IsOpen = !TimelineView.IsOpen;
                 break;
 
             default:

@@ -27,8 +27,17 @@ public class MainWindow : Window, IDisposable
     private float newEntryMinutes = 0;
     private float newEntrySeconds = 0;
     private string newEntryText = "";
-    private int newEntryRole = 0; // Maps to the TargetRole enum
+    private int newEntryRole = 0;
     private bool newEntryTTS = false;
+
+    // Inline entry editor state — tracks which entry row is currently expanded for editing
+    private string? editingEntryId = null;
+    private float   editMinutes    = 0;
+    private float   editSeconds    = 0;
+    private string  editText       = "";
+    private float   editPreAlert   = 5f;
+    private float   editDuration   = 3f;
+    private Vector4 editColor      = new(1f, 0.85f, 0.2f, 1f); // scratch color while editing
 
     // Font size staging — we only rebuild the font atlas when the user releases
     // the slider, not on every pixel change (which would be very expensive).
@@ -96,6 +105,17 @@ public class MainWindow : Window, IDisposable
                 ImGui.PopStyleColor();
             }
         }
+
+        // Timeline View toggle button (always visible, top-right area)
+        ImGui.SameLine(ImGui.GetWindowWidth() - 110);
+        var tvOpen = Plugin.TimelineView.IsOpen;
+        if (tvOpen) ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.2f, 0.4f, 0.6f, 1f));
+        else        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.25f, 0.25f, 0.3f, 1f));
+        if (ImGui.SmallButton("Timeline View"))
+            Plugin.TimelineView.IsOpen = !Plugin.TimelineView.IsOpen;
+        ImGui.PopStyleColor();
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Open/close the visual timeline view.");
 
         ImGui.Separator();
 
@@ -213,7 +233,17 @@ public class MainWindow : Window, IDisposable
         if (ImGui.InputText("Name", ref name, 128)) { timeline.Name = name; config.Save(); }
 
         var enabled = timeline.Enabled;
-        if (ImGui.Checkbox("Enabled", ref enabled)) { timeline.Enabled = enabled; config.Save(); }
+        if (ImGui.Checkbox("Enabled", ref enabled))
+        {
+            timeline.Enabled = enabled;
+            config.Save();
+            // If this timeline is currently active in the engine, reload it
+            // immediately so the engine sees the new Enabled state right now.
+            // LoadTimeline calls Reset() which stops the stopwatch and clears
+            // all fired-entry tracking, so no stale alerts will linger.
+            if (Plugin.Engine.ActiveTimelineName == timeline.Name)
+                Plugin.Engine.LoadTimeline(timeline);
+        }
         ImGui.SameLine();
 
         var territoryId = (int)timeline.TerritoryTypeId;
@@ -265,7 +295,19 @@ public class MainWindow : Window, IDisposable
         }
 
         ImGui.Separator();
-        ImGui.TextColored(new Vector4(0.8f, 0.8f, 1f, 1f), $"Entries ({timeline.Entries.Count})");
+
+        // If the timeline itself is disabled, grey out the entire entry list so it's
+        // visually clear that nothing will fire — even if individual entries are checked.
+        if (!timeline.Enabled)
+        {
+            ImGui.TextColored(new Vector4(1f, 0.5f, 0.2f, 1f), $"Entries ({timeline.Entries.Count}) — TIMELINE IS DISABLED, no callouts will fire");
+            ImGui.BeginDisabled();
+        }
+        else
+        {
+            ImGui.TextColored(new Vector4(0.8f, 0.8f, 1f, 1f), $"Entries ({timeline.Entries.Count})");
+        }
+
         ImGui.BeginChild("EntryList", new Vector2(0, 0), false);
 
         if (timeline.Entries.Count > 0)
@@ -275,48 +317,214 @@ public class MainWindow : Window, IDisposable
         }
 
         string? entryToDelete = null;
+        bool needsSort = false;
         foreach (var entry in timeline.Entries)
         {
             ImGui.PushID(entry.Id);
+
+            bool isEditing = editingEntryId == entry.Id;
+
+            // ---- Enabled checkbox (always visible) ----
             var entryEnabled = entry.Enabled;
             if (ImGui.Checkbox("##en", ref entryEnabled)) { entry.Enabled = entryEnabled; config.Save(); }
-
-            //Add a Role dropdown for existing entries! ---
             ImGui.SameLine();
-            ImGui.SetNextItemWidth(75);
-            int currentRole = (int)entry.TargetRole;
-            if (ImGui.Combo("##role" + entry.Id, ref currentRole, "All\0Tank\0Healer\0DPS\0"))
+
+            if (isEditing)
             {
-                entry.TargetRole = (TargetRole)currentRole;
-                config.Save();
-            }
-            // ------------------------------------------------------
+                // ================================================================
+                // EXPANDED EDIT ROW
+                // ================================================================
 
-            // --- Add a TTS toggle for existing entries ---
-            ImGui.SameLine();
-            bool hasTTS = (entry.AlertTypes & AlertType.Sound) != 0;
-            if (ImGui.Checkbox("TTS", ref hasTTS))
+                // Time fields
+                ImGui.SetNextItemWidth(40);
+                ImGui.InputFloat("##emin", ref editMinutes, 0, 0, "%.0f");
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Minutes");
+                ImGui.SameLine();
+                ImGui.TextDisabled(":");
+                ImGui.SameLine();
+                ImGui.SetNextItemWidth(48);
+                ImGui.InputFloat("##esec", ref editSeconds, 0, 0, "%.1f");
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Seconds");
+                ImGui.SameLine();
+
+                // Callout text
+                ImGui.SetNextItemWidth(140);
+                ImGui.InputText("##etxt", ref editText, 128);
+                ImGui.SameLine();
+
+                // Role dropdown
+                ImGui.SetNextItemWidth(72);
+                int editRole = (int)entry.TargetRole;
+                if (ImGui.Combo("##erole", ref editRole, "All\0Tank\0Healer\0DPS\0"))
+                {
+                    entry.TargetRole = (TargetRole)editRole;
+                    config.Save();
+                }
+                ImGui.SameLine();
+
+                // TTS toggle
+                bool hasTTS = (entry.AlertTypes & AlertType.Sound) != 0;
+                if (ImGui.Checkbox("TTS##e", ref hasTTS))
+                {
+                    if (hasTTS) entry.AlertTypes |= AlertType.Sound;
+                    else        entry.AlertTypes &= ~AlertType.Sound;
+                    config.Save();
+                }
+                ImGui.SameLine();
+
+                // Per-entry color picker — small inline swatch that opens a popup
+                // ColorButton renders a colored square; clicking it opens ColorPicker4.
+                // We use NoAlpha since the overlay alpha is driven by the fade system.
+                ImGui.ColorButton("##ecol", editColor,
+                    ImGuiColorEditFlags.NoAlpha | ImGuiColorEditFlags.NoPicker,
+                    new Vector2(18, 18));
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Click to change callout color.\nRight-click to reset to global default.");
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                    ImGui.OpenPopup("##ecolpicker");
+                // Right-click resets to the global default color
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                {
+                    var d = config.DefaultAlertColor;
+                    editColor = new Vector4(d[0], d[1], d[2], d[3]);
+                }
+                if (ImGui.BeginPopup("##ecolpicker"))
+                {
+                    ImGui.ColorPicker4("##ecolpick4", ref editColor,
+                        ImGuiColorEditFlags.NoAlpha | ImGuiColorEditFlags.PickerHueBar);
+                    ImGui.EndPopup();
+                }
+                ImGui.SameLine();
+
+                // Pre-alert and duration (second line indented)
+                ImGui.SetNextItemWidth(50);
+                ImGui.InputFloat("Pre##epre", ref editPreAlert, 0, 0, "%.0f");
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Pre-alert seconds (countdown start)");
+                ImGui.SameLine();
+                ImGui.SetNextItemWidth(50);
+                ImGui.InputFloat("Dur##edur", ref editDuration, 0, 0, "%.0f");
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Display duration after trigger (seconds)");
+                ImGui.SameLine();
+
+                // Save button — writes all edited fields back to the entry
+                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.15f, 0.5f, 0.15f, 1f));
+                if (ImGui.SmallButton("Save"))
+                {
+                    entry.TriggerTime     = (editMinutes * 60f) + editSeconds;
+                    entry.CalloutText     = editText;
+                    entry.PreAlertSeconds = editPreAlert;
+                    entry.DisplayDuration = editDuration;
+
+                    // Save color — if it matches the global default exactly, store null
+                    // so the entry uses the global setting rather than a redundant override.
+                    var d = config.DefaultAlertColor;
+                    bool isDefault = MathF.Abs(editColor.X - d[0]) < 0.001f
+                                  && MathF.Abs(editColor.Y - d[1]) < 0.001f
+                                  && MathF.Abs(editColor.Z - d[2]) < 0.001f;
+                    entry.Color = isDefault ? null : new[] { editColor.X, editColor.Y, editColor.Z, 1f };
+
+                    needsSort      = true;
+                    config.Save();
+                    editingEntryId = null;
+                }
+                ImGui.PopStyleColor();
+                ImGui.SameLine();
+
+                // Cancel — discard edits and collapse
+                if (ImGui.SmallButton("Cancel"))
+                    editingEntryId = null;
+                ImGui.SameLine();
+
+                // Delete
+                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.8f, 0.2f, 0.2f, 1f));
+                if (ImGui.SmallButton("X")) entryToDelete = entry.Id;
+                ImGui.PopStyleColor();
+            }
+            else
             {
-                if (hasTTS) entry.AlertTypes |= AlertType.Sound;   // Turn on
-                else entry.AlertTypes &= ~AlertType.Sound;         // Turn off
-                config.Save();
-            }
-            // --------------------------------------------------
+                // ================================================================
+                // COLLAPSED READ-ONLY ROW  (click the row to expand for editing)
+                // ================================================================
 
-            ImGui.SameLine();
-            ImGui.TextColored(entry.Enabled ? new Vector4(1,1,1,1) : new Vector4(.5f,.5f,.5f,1), $"{entry.FormattedTime,6}");
-            ImGui.SameLine();
-            ImGui.TextColored(entry.Enabled ? new Vector4(1f,0.85f,0.2f,1f) : new Vector4(.5f,.4f,.2f,1f), entry.CalloutText);
-            ImGui.SameLine(ImGui.GetWindowWidth() - 120);
-            ImGui.TextDisabled($"{entry.PreAlertSeconds:F0}s  {entry.DisplayDuration:F0}s");
-            ImGui.SameLine(ImGui.GetWindowWidth() - 30);
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.8f, 0.2f, 0.2f, 1f));
-            if (ImGui.SmallButton("X")) entryToDelete = entry.Id;
-            ImGui.PopStyleColor();
+                // Role dropdown — always editable even when collapsed
+                ImGui.SetNextItemWidth(75);
+                int currentRole = (int)entry.TargetRole;
+                if (ImGui.Combo("##role", ref currentRole, "All\0Tank\0Healer\0DPS\0"))
+                {
+                    entry.TargetRole = (TargetRole)currentRole;
+                    config.Save();
+                }
+                ImGui.SameLine();
+
+                // TTS toggle — always editable even when collapsed
+                bool hasTTS = (entry.AlertTypes & AlertType.Sound) != 0;
+                if (ImGui.Checkbox("TTS##c", ref hasTTS))
+                {
+                    if (hasTTS) entry.AlertTypes |= AlertType.Sound;
+                    else        entry.AlertTypes &= ~AlertType.Sound;
+                    config.Save();
+                }
+                ImGui.SameLine();
+
+                // Color swatch — shows entry color (or global default if none set).
+                // Read-only on the collapsed row; open Edit to change it.
+                var swatchArr = entry.Color ?? config.DefaultAlertColor;
+                var swatchVec = new Vector4(swatchArr[0], swatchArr[1], swatchArr[2], 1f);
+                // Dim the swatch if the entry is disabled so it matches the greyed-out text
+                if (!entry.Enabled) swatchVec = swatchVec with { W = 0.35f };
+                ImGui.ColorButton("##cswatch", swatchVec,
+                    ImGuiColorEditFlags.NoAlpha | ImGuiColorEditFlags.NoPicker | ImGuiColorEditFlags.NoTooltip,
+                    new Vector2(12, 12));
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip(entry.Color == null ? "Using global default color" : "Custom color (edit to change)");
+                ImGui.SameLine();
+
+                // Time + text display — clicking opens the editor
+                var rowColor = entry.Enabled
+                    ? new Vector4(1f, 1f, 1f, 1f)
+                    : new Vector4(0.5f, 0.5f, 0.5f, 1f);
+                var textColor = entry.Enabled
+                    ? new Vector4(1f, 0.85f, 0.2f, 1f)
+                    : new Vector4(0.5f, 0.4f, 0.2f, 1f);
+
+                ImGui.TextColored(rowColor, $"{entry.FormattedTime,6}");
+                ImGui.SameLine();
+                ImGui.TextColored(textColor, entry.CalloutText);
+                ImGui.SameLine(ImGui.GetWindowWidth() - 150);
+                ImGui.TextDisabled($"{entry.PreAlertSeconds:F0}s / {entry.DisplayDuration:F0}s");
+                ImGui.SameLine(ImGui.GetWindowWidth() - 60);
+
+                // Edit button — expands the row and populates scratch fields
+                ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.2f, 0.35f, 0.55f, 1f));
+                if (ImGui.SmallButton("Edit"))
+                {
+                    editingEntryId = entry.Id;
+                    editMinutes    = (float)Math.Floor(entry.TriggerTime / 60f);
+                    editSeconds    = entry.TriggerTime % 60f;
+                    editText       = entry.CalloutText;
+                    editPreAlert   = entry.PreAlertSeconds;
+                    editDuration   = entry.DisplayDuration;
+                    // Load the entry's color if it has one, otherwise start from the global default
+                    var c = entry.Color ?? Plugin.Configuration.DefaultAlertColor;
+                    editColor = new Vector4(c[0], c[1], c[2], c[3]);
+                }
+                ImGui.PopStyleColor();
+                ImGui.SameLine();
+
+                // Delete
+                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.8f, 0.2f, 0.2f, 1f));
+                if (ImGui.SmallButton("X")) entryToDelete = entry.Id;
+                ImGui.PopStyleColor();
+            }
+
             ImGui.PopID();
         }
         if (entryToDelete != null) { timeline.Entries.RemoveAll(e => e.Id == entryToDelete); config.Save(); }
+        if (needsSort) { timeline.Entries.Sort((a, b) => a.TriggerTime.CompareTo(b.TriggerTime)); config.Save(); }
         ImGui.EndChild();
+
+        // Close the BeginDisabled block we opened when the timeline is disabled
+        if (!timeline.Enabled)
+            ImGui.EndDisabled();
     }
 
     // =========================================================================
@@ -430,6 +638,76 @@ public class MainWindow : Window, IDisposable
         ImGui.Spacing();
         ImGui.Spacing();
 
+        // ---- COOLDOWN TRACKER ----
+        ImGui.TextColored(new Vector4(0.8f, 0.8f, 1f, 1f), "Cooldown Tracker HUD");
+        ImGui.Separator();
+        ImGui.Spacing();
+
+        var ctEnabled = config.CooldownTrackerEnabled;
+        if (ImGui.Checkbox("Enable cooldown tracker overlay", ref ctEnabled))
+        { config.CooldownTrackerEnabled = ctEnabled; config.Save(); }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Shows upcoming callouts as a small sidebar during combat.\nDrag the panel in-game to reposition it.");
+
+        if (config.CooldownTrackerEnabled)
+        {
+            ImGui.Spacing();
+
+            // Entry count
+            ImGui.SetNextItemWidth(120);
+            var ctCount = config.CooldownTrackerEntryCount;
+            if (ImGui.SliderInt("Entries shown##ctcount", ref ctCount, 1, 8))
+            { config.CooldownTrackerEntryCount = ctCount; config.Save(); }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("How many upcoming callouts to display at once.");
+
+            // Background opacity
+            ImGui.SetNextItemWidth(120);
+            var ctAlpha = config.CooldownTrackerBgAlpha;
+            if (ImGui.SliderFloat("Background opacity##ctalpha", ref ctAlpha, 0f, 1f, "%.2f"))
+            { config.CooldownTrackerBgAlpha = ctAlpha; config.Save(); }
+
+            // Role filter
+            var ctRole = config.CooldownTrackerRoleFilter;
+            if (ImGui.Checkbox("Filter by my role", ref ctRole))
+            { config.CooldownTrackerRoleFilter = ctRole; config.Save(); }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Only show callouts matching your current job role.\nTurn off to see all callouts regardless of role.");
+
+            // Show timer
+            var ctTimer = config.CooldownTrackerShowTimer;
+            if (ImGui.Checkbox("Show fight timer in tracker", ref ctTimer))
+            { config.CooldownTrackerShowTimer = ctTimer; config.Save(); }
+
+            // ---- Reposition button ----
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            bool editMode = Plugin.CooldownTracker.IsEditMode;
+            if (editMode)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Button,        new Vector4(0.15f, 0.55f, 0.15f, 1f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.2f,  0.7f,  0.2f,  1f));
+                ImGui.PushStyleColor(ImGuiCol.ButtonActive,  new Vector4(0.1f,  0.4f,  0.1f,  1f));
+                if (ImGui.Button("Done Repositioning", new Vector2(160, 0)))
+                    Plugin.CooldownTracker.IsEditMode = false;
+                ImGui.PopStyleColor(3);
+                ImGui.SameLine();
+                ImGui.TextColored(new Vector4(1f, 0.6f, 0.1f, 1f), "Drag the orange panel");
+            }
+            else
+            {
+                if (ImGui.Button("Reposition HUD", new Vector2(120, 0)))
+                    Plugin.CooldownTracker.IsEditMode = true;
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Shows a preview panel on screen with an orange border.\nDrag it to reposition, then click 'Done Repositioning'.");
+            }
+        }
+
+        ImGui.Spacing();
+        ImGui.Spacing();
+
         // ---- PREVIEW ----
         // Shows a mock alert using the current settings so the user can tune
         // font size, color, and position without needing to be in combat.
@@ -451,19 +729,21 @@ public class MainWindow : Window, IDisposable
     // =========================================================================
     private void DrawDebugTab(Configuration config)
     {
-        ImGui.Spacing();
-
-        // --- Current Territory ---
-        var currentTerritory = Plugin.CurrentTerritoryId;
-        ImGui.TextColored(new Vector4(0.4f, 1f, 0.8f, 1f), "Current Territory ID:");
-        ImGui.SameLine();
-        ImGui.Text($"{currentTerritory}");
-        ImGui.SameLine();
-
         var selectedTimeline = config.Timelines.FirstOrDefault(t => t.Id == config.SelectedTimelineId);
+
+        // =========================================================
+        // SECTION 1: TERRITORY
+        // =========================================================
+        ImGui.Spacing();
+        ImGui.TextColored(new Vector4(0.4f, 1f, 0.8f, 1f), "[1] TERRITORY");
+        ImGui.Separator();
+
+        var currentTerritory = Plugin.CurrentTerritoryId;
+        ImGui.Text($"  Current Territory ID: {currentTerritory}");
+        ImGui.SameLine();
         if (selectedTimeline != null)
         {
-            if (ImGui.SmallButton("Use This ID on Selected Timeline"))
+            if (ImGui.SmallButton("Use This ID"))
             {
                 selectedTimeline.TerritoryTypeId = currentTerritory;
                 config.Save();
@@ -473,71 +753,143 @@ public class MainWindow : Window, IDisposable
         }
         else
         {
-            ImGui.TextDisabled("(select a timeline to copy ID into it)");
+            ImGui.TextDisabled("(select a timeline to copy this ID)");
         }
 
+        // =========================================================
+        // SECTION 2: ENGINE STATE
+        // =========================================================
         ImGui.Spacing();
+        ImGui.TextColored(new Vector4(0.4f, 1f, 0.8f, 1f), "[2] ENGINE STATE");
+        ImGui.Separator();
 
-        // --- Engine State ---
-        ImGui.TextColored(new Vector4(0.4f, 1f, 0.8f, 1f), "Engine State:");
-        ImGui.Text($"  Running:         {Plugin.Engine.IsRunning}");
+        // Stopwatch running?
+        var isRunning = Plugin.Engine.IsRunning;
+        ImGui.Text("  Timer Running:   ");
+        ImGui.SameLine();
+        ImGui.TextColored(
+            isRunning ? new Vector4(0.2f, 1f, 0.2f, 1f) : new Vector4(0.6f, 0.6f, 0.6f, 1f),
+            isRunning ? "YES" : "NO");
+
         ImGui.Text($"  Fight Time:      {Plugin.Engine.CurrentTime:F2}s");
-        var timelineName = Plugin.Engine.ActiveTimelineName;
-        if (timelineName == null)
-            ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), "  Active Timeline: (none — callouts will not fire!)");
+
+        // Which timeline does the engine currently have loaded?
+        var engineTimelineName = Plugin.Engine.ActiveTimelineName;
+        var engineEnabled = Plugin.Engine.ActiveTimelineEnabled;   // new property — see below
+        ImGui.Text("  Loaded Timeline: ");
+        ImGui.SameLine();
+        if (engineTimelineName == null)
+            ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), "(none — callouts WILL NOT fire)");
         else
-            ImGui.Text($"  Active Timeline: {timelineName}");
+            ImGui.Text(engineTimelineName);
 
+        // Is the engine's loaded timeline actually enabled?
+        ImGui.Text("  Timeline Enabled (engine sees): ");
+        ImGui.SameLine();
+        ImGui.TextColored(
+            engineEnabled ? new Vector4(0.2f, 1f, 0.2f, 1f) : new Vector4(1f, 0.4f, 0.4f, 1f),
+            engineEnabled ? "YES — will fire callouts" : "NO  — callouts BLOCKED");
+
+        // Would combat start currently fire?
+        var wouldStart = engineTimelineName != null && engineEnabled;
+        ImGui.Text("  Combat start would fire:       ");
+        ImGui.SameLine();
+        ImGui.TextColored(
+            wouldStart ? new Vector4(0.2f, 1f, 0.2f, 1f) : new Vector4(1f, 0.4f, 0.4f, 1f),
+            wouldStart ? "YES" : "NO (no timeline, or timeline disabled)");
+
+        // =========================================================
+        // SECTION 3: SELECTED TIMELINE
+        // =========================================================
         ImGui.Spacing();
+        ImGui.TextColored(new Vector4(0.4f, 1f, 0.8f, 1f), "[3] SELECTED TIMELINE (UI)");
+        ImGui.Separator();
 
-        // --- Timeline Match Check ---
-        if (selectedTimeline != null)
+        if (selectedTimeline == null)
         {
-            ImGui.TextColored(new Vector4(0.4f, 1f, 0.8f, 1f), "Timeline Match Check:");
+            ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), "  None selected — pick one in the Timelines tab.");
+        }
+        else
+        {
+            ImGui.Text($"  Name:            {selectedTimeline.Name}");
+
+            // Enabled flag on the config object (what the checkbox controls)
+            ImGui.Text("  Enabled (config): ");
+            ImGui.SameLine();
+            ImGui.TextColored(
+                selectedTimeline.Enabled ? new Vector4(0.2f, 1f, 0.2f, 1f) : new Vector4(1f, 0.4f, 0.4f, 1f),
+                selectedTimeline.Enabled ? "YES" : "NO");
+
+            // Engine vs config agreement check
+            var engineMatchesConfig = engineTimelineName == selectedTimeline.Name && engineEnabled == selectedTimeline.Enabled;
+            ImGui.Text("  Engine/config in sync: ");
+            ImGui.SameLine();
+            ImGui.TextColored(
+                engineMatchesConfig ? new Vector4(0.2f, 1f, 0.2f, 1f) : new Vector4(1f, 0.7f, 0.3f, 1f),
+                engineMatchesConfig ? "YES" : "MISMATCH — try selecting timeline again");
+
+            // Territory match
             var idMatches = selectedTimeline.TerritoryTypeId == currentTerritory;
-            ImGui.Text($"  Selected timeline territory: {selectedTimeline.TerritoryTypeId}");
-            ImGui.Text($"  Your current territory:      {currentTerritory}  ");
+            ImGui.Text($"  Territory (timeline): {selectedTimeline.TerritoryTypeId}  |  Territory (current): {currentTerritory}  ");
             ImGui.SameLine();
             ImGui.TextColored(
                 idMatches ? new Vector4(0.2f, 1f, 0.2f, 1f) : new Vector4(1f, 0.4f, 0.4f, 1f),
-                idMatches ? "MATCH ✓" : "NO MATCH ✗");
+                idMatches ? "MATCH" : "NO MATCH");
 
             if (!idMatches)
                 ImGui.TextColored(new Vector4(1f, 0.7f, 0.3f, 1f),
-                    "  ⚠ IDs don't match — auto-load won't trigger.\n    Click 'Use This ID' above, or use 'Start Test'.");
+                    "  ⚠ Territory mismatch — auto-load won't trigger. Use 'Start Test' or fix the ID above.");
 
+            // =========================================================
+            // SECTION 4: ENTRIES
+            // =========================================================
             ImGui.Spacing();
+            ImGui.TextColored(new Vector4(0.4f, 1f, 0.8f, 1f), "[4] ENTRIES");
+            ImGui.Separator();
 
-            // --- Entry Count ---
-            var entryCount = selectedTimeline.Entries.Count;
-            var enabledCount = selectedTimeline.Entries.Count(e => e.Enabled);
-            ImGui.TextColored(new Vector4(0.4f, 1f, 0.8f, 1f), "Entries:");
-            ImGui.Text($"  Total: {entryCount}   Enabled: {enabledCount}");
-            if (entryCount == 0)
-                ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), "  ⚠ No entries! Add callouts in the Timelines tab.");
-            else if (enabledCount == 0)
-                ImGui.TextColored(new Vector4(1f, 0.7f, 0.3f, 1f), "  ⚠ All entries are disabled.");
+            var totalEntries   = selectedTimeline.Entries.Count;
+            var enabledEntries = selectedTimeline.Entries.Count(e => e.Enabled);
+            ImGui.Text($"  Total: {totalEntries}   Enabled: {enabledEntries}   Disabled: {totalEntries - enabledEntries}");
 
-            // --- Next Callout ---
-            if (Plugin.Engine.IsRunning && enabledCount > 0)
+            if (totalEntries == 0)
+                ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), "  ⚠ No entries in this timeline!");
+            else if (enabledEntries == 0)
+                ImGui.TextColored(new Vector4(1f, 0.7f, 0.3f, 1f), "  ⚠ All entries are individually disabled.");
+            else if (!selectedTimeline.Enabled)
+                ImGui.TextColored(new Vector4(1f, 0.7f, 0.3f, 1f),
+                    $"  ⚠ {enabledEntries} entries ready, but the TIMELINE is disabled — nothing will fire.");
+
+            // =========================================================
+            // SECTION 5: NEXT CALLOUT (only when running)
+            // =========================================================
+            if (Plugin.Engine.IsRunning)
             {
-                var currentTime = Plugin.Engine.CurrentTime;
-                var next = selectedTimeline.Entries
-                    .Where(e => e.Enabled && e.TriggerTime > currentTime)
-                    .OrderBy(e => e.TriggerTime)
-                    .FirstOrDefault();
-
                 ImGui.Spacing();
-                ImGui.TextColored(new Vector4(0.4f, 1f, 0.8f, 1f), "Next Callout:");
-                if (next != null)
-                    ImGui.Text($"  \"{next.CalloutText}\" at {next.FormattedTime} (in {next.TriggerTime - currentTime:F1}s)");
+                ImGui.TextColored(new Vector4(0.4f, 1f, 0.8f, 1f), "[5] NEXT CALLOUT");
+                ImGui.Separator();
+
+                if (!selectedTimeline.Enabled)
+                {
+                    ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), "  Timeline disabled — no callouts will fire.");
+                }
+                else if (enabledEntries == 0)
+                {
+                    ImGui.TextColored(new Vector4(1f, 0.4f, 0.4f, 1f), "  No enabled entries.");
+                }
                 else
-                    ImGui.TextDisabled("  No more entries after current fight time.");
+                {
+                    var currentTime = Plugin.Engine.CurrentTime;
+                    var next = selectedTimeline.Entries
+                        .Where(e => e.Enabled && e.TriggerTime > currentTime)
+                        .OrderBy(e => e.TriggerTime)
+                        .FirstOrDefault();
+
+                    if (next != null)
+                        ImGui.Text($"  \"{next.CalloutText}\"  at {next.FormattedTime}  (in {next.TriggerTime - currentTime:F1}s)");
+                    else
+                        ImGui.TextDisabled("  No more entries after current fight time.");
+                }
             }
-        }
-        else
-        {
-            ImGui.TextDisabled("Select a timeline in the Timelines tab to see match info.");
         }
     }
 }

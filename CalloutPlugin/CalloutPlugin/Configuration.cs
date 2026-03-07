@@ -59,6 +59,62 @@ public class Configuration : IPluginConfiguration
     public string? SelectedTimelineId { get; set; } = null;
 
     // =========================================================================
+    // TIMELINE VIEW SETTINGS
+    // =========================================================================
+
+    /// <summary>Horizontal zoom: how many pixels represent one second on the timeline.</summary>
+    public float TimelinePixelsPerSecond { get; set; } = 8f;
+
+    /// <summary>Height of each role track in pixels.</summary>
+    public float TimelineTrackHeight { get; set; } = 32f;
+
+    /// <summary>Whether to draw entry labels (callout text) on the timeline.</summary>
+    public bool TimelineShowLabels { get; set; } = true;
+
+    /// <summary>Whether to draw the pre-alert window block (dimmer region before trigger).</summary>
+    public bool TimelineShowPreAlertBlocks { get; set; } = true;
+
+    /// <summary>Whether to draw the live playhead line during combat.</summary>
+    public bool TimelineShowPlayhead { get; set; } = true;
+
+    /// <summary>Color for Tank-role entries on the timeline (RGBA 0-1).</summary>
+    public float[] TimelineColorTank    { get; set; } = [0.3f, 0.6f, 1.0f, 1f];   // blue
+
+    /// <summary>Color for Healer-role entries on the timeline (RGBA 0-1).</summary>
+    public float[] TimelineColorHealer  { get; set; } = [0.3f, 1.0f, 0.4f, 1f];   // green
+
+    /// <summary>Color for DPS-role entries on the timeline (RGBA 0-1).</summary>
+    public float[] TimelineColorDPS     { get; set; } = [1.0f, 0.35f, 0.35f, 1f]; // red
+
+    /// <summary>Color for All-role entries on the timeline (RGBA 0-1).</summary>
+    public float[] TimelineColorAll     { get; set; } = [1.0f, 0.85f, 0.2f,  1f]; // yellow
+
+    // =========================================================================
+    // COOLDOWN TRACKER HUD SETTINGS
+    // =========================================================================
+
+    /// <summary>Whether the cooldown tracker HUD is visible during combat.</summary>
+    public bool CooldownTrackerEnabled { get; set; } = true;
+
+    /// <summary>How many upcoming callouts to show in the tracker.</summary>
+    public int CooldownTrackerEntryCount { get; set; } = 4;
+
+    /// <summary>Screen position X (0-1, left to right).</summary>
+    public float CooldownTrackerX { get; set; } = 0.02f;
+
+    /// <summary>Screen position Y (0-1, top to bottom).</summary>
+    public float CooldownTrackerY { get; set; } = 0.4f;
+
+    /// <summary>Background opacity for the tracker panel (0=transparent, 1=opaque).</summary>
+    public float CooldownTrackerBgAlpha { get; set; } = 0.6f;
+
+    /// <summary>Whether to show only entries matching the player's current role.</summary>
+    public bool CooldownTrackerRoleFilter { get; set; } = true;
+
+    /// <summary>Whether to show the fight timer inside the tracker.</summary>
+    public bool CooldownTrackerShowTimer { get; set; } = true;
+
+    // =========================================================================
     // INTERNAL
     // =========================================================================
 
