@@ -2,6 +2,7 @@
   {
     "Author": "Thunderz96",
     "Name": "Callout Plugin",
+    "InternalName": "CalloutPlugin",
     "Punchline": "Fight timeline callouts - never miss a mitigation window again.",
     "Description": "Define per-fight timelines with ability callouts that flash on screen at specified times. Auto-detects combat start, supports countdown alerts, and import/export of timeline files. Use /callout to open.",
     "RepoUrl": "https://github.com/Thunderz96/XIV",
