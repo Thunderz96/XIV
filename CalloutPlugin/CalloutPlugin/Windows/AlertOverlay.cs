@@ -19,6 +19,7 @@ using System.Numerics;
 
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
+using System.Speech.Synthesis;
 
 using CalloutPlugin.Data;
 
@@ -51,6 +52,7 @@ public class AlertOverlay : Window, IDisposable
     private readonly Plugin Plugin;
     private readonly List<ActiveAlert> activeAlerts = new();
     private DateTime lastFrameTime = DateTime.UtcNow;
+    private readonly SpeechSynthesizer tts = new();
 
     public AlertOverlay(Plugin plugin)
         : base("##CalloutAlertOverlay",
@@ -73,6 +75,7 @@ public class AlertOverlay : Window, IDisposable
         SizeCondition = ImGuiCond.Always;
         PositionCondition = ImGuiCond.Always;
 
+        tts.SetOutputToDefaultAudioDevice();
         Plugin.Engine.OnCalloutTriggered += OnCalloutTriggered;
         Plugin.Engine.OnCombatEnded += OnCombatEnded;
     }
@@ -81,8 +84,9 @@ public class AlertOverlay : Window, IDisposable
     {
         Plugin.Engine.OnCalloutTriggered -= OnCalloutTriggered;
         Plugin.Engine.OnCombatEnded -= OnCombatEnded;
+        tts.Dispose();
     }
-
+    
     // =========================================================================
     // EVENT HANDLERS
     // =========================================================================
@@ -145,7 +149,15 @@ public class AlertOverlay : Window, IDisposable
             alert.SecondsUntilTrigger  -= deltaTime;
 
             if (alert.SecondsUntilTrigger <= 0 && !alert.HasTriggered)
+            {
                 alert.HasTriggered = true;
+                
+                // If this entry has the Sound flag, speak the callout text!
+                if ((alert.Entry.AlertTypes & AlertType.Sound) != 0)
+                {
+                    tts.SpeakAsync(alert.Entry.CalloutText);
+                }
+            }
 
             if (alert.IsExpired)
             {

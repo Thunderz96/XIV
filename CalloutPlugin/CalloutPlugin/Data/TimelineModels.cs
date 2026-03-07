@@ -52,8 +52,22 @@ public enum AlertType
 /// One callout within a fight timeline. For example:
 ///   "At 1:15, flash REPRISAL with a 3-second countdown"
 /// </summary>
+
+public enum TargetRole
+{
+    Tank = 1,
+    Healer = 2,
+    DPS = 3,
+    All = 0
+}
+
 public class TimelineEntry
 {
+    /// <summary>
+    /// which role this callout is for (tank/healer/dps/all).
+    /// </summary>
+    public TargetRole TargetRole { get; set; } = TargetRole.All;
+    
     /// <summary>
     /// Unique ID for this entry (used for editing/deleting).
     /// Generated automatically when creating a new entry.

@@ -27,6 +27,8 @@ public class MainWindow : Window, IDisposable
     private float newEntryMinutes = 0;
     private float newEntrySeconds = 0;
     private string newEntryText = "";
+    private int newEntryRole = 0; // Maps to the TargetRole enum
+    private bool newEntryTTS = false;
 
     // Font size staging — we only rebuild the font atlas when the user releases
     // the slider, not on every pixel change (which would be very expensive).
@@ -147,6 +149,34 @@ public class MainWindow : Window, IDisposable
         }
         ImGui.Spacing();
 
+        // Import / Export Buttons ---
+        if (ImGui.Button("Copy to Clipboard"))
+        {
+            var selected = config.Timelines.FirstOrDefault(t => t.Id == config.SelectedTimelineId);
+            if (selected != null)
+            {
+                var json = Newtonsoft.Json.JsonConvert.SerializeObject(selected, Newtonsoft.Json.Formatting.Indented);
+                ImGui.SetClipboardText(json);
+            }
+        }
+        if (ImGui.Button("Paste from Clipboard"))
+        {
+            try
+            {
+                var json = ImGui.GetClipboardText();
+                var imported = Newtonsoft.Json.JsonConvert.DeserializeObject<FightTimeline>(json);
+                if (imported != null)
+                {
+                    imported.Id = Guid.NewGuid().ToString("N")[..8]; // ensure a brand new ID
+                    config.Timelines.Add(imported);
+                    config.SelectedTimelineId = imported.Id;
+                    config.Save();
+                }
+            }
+            catch { /* Ignore invalid clipboard data */ }
+        }
+        ImGui.Spacing();
+
         foreach (var timeline in config.Timelines)
         {
             var isSelected = config.SelectedTimelineId == timeline.Id;
@@ -206,14 +236,28 @@ public class MainWindow : Window, IDisposable
         ImGui.SetNextItemWidth(150); ImGui.InputText("Text", ref newEntryText, 128);
         ImGui.SameLine();
 
+        // --- Role and TTS inputs ---
+        ImGui.SetNextItemWidth(80);
+        ImGui.Combo("Role", ref newEntryRole, "All\0Tank\0Healer\0DPS\0");
+        ImGui.SameLine();
+        ImGui.Checkbox("TTS", ref newEntryTTS);
+        ImGui.SameLine();
+        // --------------------------------
+
         if (ImGui.Button("Add") && newEntryText.Length > 0)
         {
+            // Determine alert types based on the TTS checkbox
+            var alertFlags = AlertType.ScreenFlash | AlertType.Countdown;
+            if (newEntryTTS) alertFlags |= AlertType.Sound;
+
             timeline.Entries.Add(new TimelineEntry
             {
                 TriggerTime = (newEntryMinutes * 60f) + newEntrySeconds,
                 CalloutText = newEntryText,
                 PreAlertSeconds = config.DefaultPreAlertSeconds,
                 DisplayDuration = config.DefaultDisplayDuration,
+                TargetRole = (TargetRole)newEntryRole,
+                AlertTypes = alertFlags                
             });
             timeline.Entries.Sort((a, b) => a.TriggerTime.CompareTo(b.TriggerTime));
             newEntryText = "";
@@ -236,6 +280,29 @@ public class MainWindow : Window, IDisposable
             ImGui.PushID(entry.Id);
             var entryEnabled = entry.Enabled;
             if (ImGui.Checkbox("##en", ref entryEnabled)) { entry.Enabled = entryEnabled; config.Save(); }
+
+            //Add a Role dropdown for existing entries! ---
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(75);
+            int currentRole = (int)entry.TargetRole;
+            if (ImGui.Combo("##role" + entry.Id, ref currentRole, "All\0Tank\0Healer\0DPS\0"))
+            {
+                entry.TargetRole = (TargetRole)currentRole;
+                config.Save();
+            }
+            // ------------------------------------------------------
+
+            // --- Add a TTS toggle for existing entries ---
+            ImGui.SameLine();
+            bool hasTTS = (entry.AlertTypes & AlertType.Sound) != 0;
+            if (ImGui.Checkbox("TTS", ref hasTTS))
+            {
+                if (hasTTS) entry.AlertTypes |= AlertType.Sound;   // Turn on
+                else entry.AlertTypes &= ~AlertType.Sound;         // Turn off
+                config.Save();
+            }
+            // --------------------------------------------------
+
             ImGui.SameLine();
             ImGui.TextColored(entry.Enabled ? new Vector4(1,1,1,1) : new Vector4(.5f,.5f,.5f,1), $"{entry.FormattedTime,6}");
             ImGui.SameLine();

@@ -211,8 +211,24 @@ public class TimelineEngine : IDisposable
         {
             if (!entry.Enabled)
                 continue;
+            // Check if the player's role matches the target role ---
+            if (entry.TargetRole != TargetRole.All && ClientState.LocalPlayer != null)
+            {
+                // Lumina's Role ID mapping: 1 = Tank, 2 = Melee DPS, 3 = Ranged DPS, 4 = Healer
+                var roleId = ClientState.LocalPlayer.ClassJob.Value.Role;
+                bool roleMatch = entry.TargetRole switch
+                {
+                    TargetRole.Tank => roleId == 1,
+                    TargetRole.Healer => roleId == 5, 
+                    TargetRole.DPS => roleId == 2 || roleId == 3 || roleId == 4, 
+                    _ => true
+                };
 
-            // Check if we should start the PRE-ALERT (countdown)
+                // If it doesn't match, skip processing this entry entirely
+                if (!roleMatch) continue;
+            }
+            // ---------------------------------------------------------------
+           // Check if we should start the PRE-ALERT (countdown)
             var preAlertTime = entry.TriggerTime - entry.PreAlertSeconds;
             if (currentTime >= preAlertTime && !firedPreAlerts.Contains(entry.Id))
             {
