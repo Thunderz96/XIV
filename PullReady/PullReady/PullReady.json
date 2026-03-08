@@ -1,0 +1,14 @@
+{
+  "Author": "Thunderz96",
+  "Name": "PullReady",
+  "Punchline": "Pre-pull readiness checker for savage/ultimate raids.",
+  "Description": "Checks your food buff, gear condition, inventory items, and party food status before pulling. Shows a clear green/yellow/red overlay so your static never pulls unprepared.",
+  "InternalName": "PullReady",
+  "AssemblyVersion": "1.0.0.0",
+  "RepoUrl": "https://github.com/Thunderz96/XIV",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 14,
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "Tags": ["raid", "utility", "food", "checklist"]
+}

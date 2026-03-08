@@ -6,8 +6,11 @@
 **/.vs/
 *.user
 *.suo
+.editorconfig
 
 # OS junk
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+.gitignore

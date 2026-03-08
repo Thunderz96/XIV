@@ -115,6 +115,16 @@ public class Configuration : IPluginConfiguration
     public bool CooldownTrackerShowTimer { get; set; } = true;
 
     // =========================================================================
+    // FFLOGS IMPORT
+    // =========================================================================
+
+    /// <summary>
+    /// FF Logs v1 public API key. Get one at: https://www.fflogs.com/profile
+    /// Scroll down to "Web API Key". This is a single string — no OAuth needed.
+    /// </summary>
+    public string? FflogsApiKey { get; set; } = null;
+
+    // =========================================================================
     // INTERNAL
     // =========================================================================
 

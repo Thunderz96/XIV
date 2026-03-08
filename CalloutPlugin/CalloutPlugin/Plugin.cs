@@ -33,7 +33,7 @@ public sealed class Plugin : IDalamudPlugin
     // ---- Dalamud Services ----
     private readonly IDalamudPluginInterface PluginInterface;
     private readonly ICommandManager CommandManager;
-    private readonly IPluginLog Log;
+    public readonly IPluginLog Log;
     public readonly IClientState ClientState;
 
     // ---- Our Systems ----
@@ -74,6 +74,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly AlertOverlay AlertOverlay;
     public readonly TimelineView TimelineView;
     public readonly CooldownTracker CooldownTracker;
+    public readonly FflogsImportWindow FflogsImportWindow;
 
     private const string CommandName = "/callout";
 
@@ -117,15 +118,17 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         // Create windows
-        MainWindow     = new MainWindow(this);
-        AlertOverlay   = new AlertOverlay(this);
-        TimelineView   = new TimelineView(this);
-        CooldownTracker = new CooldownTracker(this);
+        MainWindow        = new MainWindow(this);
+        AlertOverlay      = new AlertOverlay(this);
+        TimelineView      = new TimelineView(this);
+        CooldownTracker   = new CooldownTracker(this);
+        FflogsImportWindow = new FflogsImportWindow(this);
 
         WindowSystem.AddWindow(MainWindow);
         WindowSystem.AddWindow(AlertOverlay);
         WindowSystem.AddWindow(TimelineView);
         WindowSystem.AddWindow(CooldownTracker);
+        WindowSystem.AddWindow(FflogsImportWindow);
 
         // Register commands
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)

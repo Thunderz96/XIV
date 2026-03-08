@@ -1,0 +1,63 @@
+{
+  "_comment": [
+    "HOW TO ADD/EDIT MECHANICS:",
+    "",
+    "Each mechanic has 'strats' — a list of named strategy options.",
+    "The user picks one active strat per fight in the plugin Settings tab.",
+    "All mechanics in that fight will show that strat's image.",
+    "",
+    "Fields per mechanic:",
+    "  slug        - internal ID (not shown in URL, just for reference)",
+    "  label       - name shown in the plugin UI (e.g. 'Toxic Act 1')",
+    "  triggerTime - seconds into fight when the image pops up (0 = manual only)",
+    "  strats      - list of named strat options, each with:",
+    "                  name  = label shown in the strat selector (e.g. 'Hector')",
+    "                  image = EXACT filename from wtfdig URL",
+    "",
+    "To get the filename: go to wtfdig.info, right-click an image → Copy image address.",
+    "Take everything after the last slash. E.g.:",
+    "  https://wtfdig.info/74/m12s/p1-toxic-act1-dps-zoomed.webp",
+    "                              ↑ fight id    ↑ this is the filename",
+    "",
+    "The first strat in the list is the default until the user changes it.",
+    "After editing: rebuild the plugin, then Settings → Reset / Regenerate Community Strats."
+  ],
+  "fights": [
+    {
+      "id": "74/m12s",
+      "name": "AAC Heavyweight M4 (M12S)",
+      "territoryTypeId": 1276,
+      "mechanics": [
+        {
+          "slug":        "toxic-act1",
+          "label":       "Toxic Act 1",
+          "triggerTime": 0,
+          "strats": [
+            { "name": "Toxic",  "image": "p1-toxic-act1-dps-zoomed.webp" },
+            { "name": "Hector", "image": "p1-hector-act1-dps-zoomed.webp" }
+          ]
+        },
+        {
+          "slug":        "idyllic-dream",
+          "label":       "Idyllic Dream",
+          "triggerTime": 0,
+          "strats": [
+            { "name": "Toxic",  "image": "idyllic-dream-all.webp" }
+          ]
+        }
+      ]
+    },
+    { "id": "74/m11s", "name": "AAC Heavyweight M3 (M11S)", "territoryTypeId": 1275, "mechanics": [] },
+    { "id": "74/m10s", "name": "AAC Heavyweight M2 (M10S)", "territoryTypeId": 1274, "mechanics": [] },
+    { "id": "74/m9s",  "name": "AAC Heavyweight M1 (M9S)",  "territoryTypeId": 1273, "mechanics": [] },
+    { "id": "74/ex7",  "name": "Hell on Rails (EX7)",        "territoryTypeId": 1277, "mechanics": [] },
+    { "id": "72/m8s",  "name": "AAC Cruiserweight M4 (M8S)", "territoryTypeId": 1244, "mechanics": [] },
+    { "id": "72/m7s",  "name": "AAC Cruiserweight M3 (M7S)", "territoryTypeId": 1243, "mechanics": [] },
+    { "id": "72/m6s",  "name": "AAC Cruiserweight M2 (M6S)", "territoryTypeId": 1242, "mechanics": [] },
+    { "id": "72/m5s",  "name": "AAC Cruiserweight M1 (M5S)", "territoryTypeId": 1241, "mechanics": [] },
+    { "id": "73/ex6",  "name": "Windward Wilds (EX6)",        "territoryTypeId": 1259, "mechanics": [] },
+    { "id": "73/ex5",  "name": "Necron's Embrace (EX5)",      "territoryTypeId": 1258, "mechanics": [] },
+    { "id": "71/chaotic", "name": "Cloud of Darkness (Chaotic)", "territoryTypeId": 1234, "mechanics": [] },
+    { "id": "ultimates/ucob", "name": "The Unending Coil of Bahamut (UCOB)", "territoryTypeId": 733, "mechanics": [] }
+  ]
+}

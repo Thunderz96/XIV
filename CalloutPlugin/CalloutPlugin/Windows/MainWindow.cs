@@ -137,6 +137,27 @@ public class MainWindow : Window, IDisposable
                 DrawDebugTab(config);
                 ImGui.EndTabItem();
             }
+            if (ImGui.BeginTabItem("FF Logs Import"))
+            {
+                // Show a simple launch button rather than embedding the full
+                // import UI here — it opens its own dedicated window with
+                // more space for the cast events table.
+                ImGui.Spacing();
+                ImGui.TextColored(new Vector4(0.9f, 0.75f, 0.2f, 1f), "FF Logs Cooldown Importer");
+                ImGui.Spacing();
+                ImGui.TextWrapped(
+                    "Paste a FF Logs report URL to fetch a player's cast events and " +
+                    "convert their cooldown usage into a CalloutPlugin timeline.");
+                ImGui.Spacing();
+                ImGui.Bullet(); ImGui.SameLine();
+                ImGui.TextWrapped("Requires a free FF Logs v1 API key from fflogs.com/profile");
+                ImGui.Bullet(); ImGui.SameLine();
+                ImGui.TextWrapped("Works with any public report — paste the URL from your browser");
+                ImGui.Spacing();
+                if (ImGui.Button("Open FF Logs Importer Window", new Vector2(240, 30)))
+                    Plugin.FflogsImportWindow.IsOpen = true;
+                ImGui.EndTabItem();
+            }
             ImGui.EndTabBar();
         }
     }
