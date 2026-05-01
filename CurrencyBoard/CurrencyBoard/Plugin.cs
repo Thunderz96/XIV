@@ -122,6 +122,7 @@ public sealed class Plugin : IDalamudPlugin
         IPluginLog pluginLog,
         IDataManager dataManager,
         IClientState clientState,
+        IObjectTable objectTable,
         IFramework framework)
     {
         // Store the injected services so we can use them later.
@@ -137,7 +138,7 @@ public sealed class Plugin : IDalamudPlugin
         Configuration.Initialize(PluginInterface);
 
         // Initialize our data tracker — this reads currency info from the game.
-        CurrencyTracker = new CurrencyTracker(dataManager, clientState, framework, pluginLog);
+        CurrencyTracker = new CurrencyTracker(dataManager, clientState, objectTable, framework, pluginLog);
 
         // Create our windows (UI elements drawn by ImGui).
         MainWindow = new MainWindow(this);

@@ -13,4 +13,10 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
+# Personal forks / vendored sources (NOT part of this repo)
+ThunderzCombo/
+
+# Local Claude Code project state
+.claude/
+
 .gitignore

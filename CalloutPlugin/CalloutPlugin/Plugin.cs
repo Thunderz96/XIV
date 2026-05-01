@@ -35,6 +35,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ICommandManager CommandManager;
     public readonly IPluginLog Log;
     public readonly IClientState ClientState;
+    // 7.5 / API 15: LocalPlayer moved from IClientState to IObjectTable.
+    public readonly IObjectTable ObjectTable;
 
     // ---- Our Systems ----
     public readonly WindowSystem WindowSystem = new("CalloutPlugin");
@@ -86,6 +88,7 @@ public sealed class Plugin : IDalamudPlugin
         ICommandManager commandManager,
         IPluginLog pluginLog,
         IClientState clientState,
+        IObjectTable objectTable,
         ICondition condition,
         IFramework framework)
     {
@@ -93,13 +96,14 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager = commandManager;
         Log = pluginLog;
         ClientState = clientState;
+        ObjectTable = objectTable;
 
         // Load config
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         Configuration.Initialize(PluginInterface);
 
         // Create the timeline engine
-        Engine = new TimelineEngine(condition, clientState, framework, pluginLog);
+        Engine = new TimelineEngine(condition, clientState, objectTable, framework, pluginLog);
 
         // Build a large sharp font for the alert overlay.
         // NewGameFontHandle requests FFXIV's built-in "Axis" font at a specific size.
@@ -221,7 +225,8 @@ public sealed class Plugin : IDalamudPlugin
     // =========================================================================
     // TERRITORY CHANGE — Auto-load timelines by duty
     // =========================================================================
-    private void OnTerritoryChanged(ushort territoryTypeId)
+    // 7.5 / API 15: TerritoryChanged delegate is now Action<uint> (was ushort).
+    private void OnTerritoryChanged(uint territoryTypeId)
     {
         if (!Configuration.AutoLoadTimelines)
             return;
@@ -251,5 +256,5 @@ public sealed class Plugin : IDalamudPlugin
     /// so they can copy it straight into a timeline's Territory ID field.
     /// Returns 0 if not logged in.
     /// </summary>
-    public ushort CurrentTerritoryId => ClientState.TerritoryType;
+    public uint CurrentTerritoryId => ClientState.TerritoryType;
 }

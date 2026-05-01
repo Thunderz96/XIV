@@ -144,7 +144,8 @@ public sealed class Plugin : IDalamudPlugin
     /// content) vs. just walking between open-world areas.
     /// BoundByDuty = inside a duty instance (raid, trial, dungeon, etc.)
     /// </summary>
-    private void OnTerritoryChanged(ushort territoryId)
+    // 7.5 / API 15: TerritoryChanged delegate is now Action<uint> (was ushort).
+    private void OnTerritoryChanged(uint territoryId)
     {
         if (!Configuration.AutoOpenOnZoneIn)
             return;

@@ -57,8 +57,8 @@
     <IsPackable>false</IsPackable>
     
     <!-- Dalamud API level — MUST match your installed Dalamud version.
-         API 14 is the current version as of Dawntrail. -->
-    <DalamudApiLevel>14</DalamudApiLevel>
+         API 15 = Patch 7.5 (Dalamud Beta as of 2026-04). -->
+    <DalamudApiLevel>15</DalamudApiLevel>
   </PropertyGroup>
 
   <!-- ===== DALAMUD SDK REFERENCES ===== -->

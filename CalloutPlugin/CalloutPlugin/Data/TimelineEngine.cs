@@ -53,6 +53,8 @@ public class TimelineEngine : IDisposable
 {
     private readonly ICondition Condition;
     private readonly IClientState ClientState;
+    // 7.5 / API 15: LocalPlayer moved from IClientState to IObjectTable.
+    private readonly IObjectTable ObjectTable;
     private readonly IFramework Framework;
     private readonly IPluginLog Log;
 
@@ -117,11 +119,13 @@ public class TimelineEngine : IDisposable
     public TimelineEngine(
         ICondition condition,
         IClientState clientState,
+        IObjectTable objectTable,
         IFramework framework,
         IPluginLog log)
     {
         Condition = condition;
         ClientState = clientState;
+        ObjectTable = objectTable;
         Framework = framework;
         Log = log;
 
@@ -200,7 +204,7 @@ public class TimelineEngine : IDisposable
     private void OnFrameworkUpdate(IFramework framework)
     {
         // Don't do anything if not logged in
-        if (ClientState.LocalPlayer == null)
+        if (ObjectTable.LocalPlayer == null)
             return;
 
         // ---- Combat Detection ----
@@ -249,10 +253,10 @@ public class TimelineEngine : IDisposable
             if (!entry.Enabled)
                 continue;
             // Check if the player's role matches the target role ---
-            if (entry.TargetRole != TargetRole.All && ClientState.LocalPlayer != null)
+            if (entry.TargetRole != TargetRole.All && ObjectTable.LocalPlayer != null)
             {
                 // Lumina's Role ID mapping: 1 = Tank, 2 = Melee DPS, 3 = Ranged DPS, 4 = Healer
-                var roleId = ClientState.LocalPlayer.ClassJob.Value.Role;
+                var roleId = ObjectTable.LocalPlayer.ClassJob.Value.Role;
                 bool roleMatch = entry.TargetRole switch
                 {
                     TargetRole.Tank => roleId == 1,

@@ -227,9 +227,9 @@ public class CooldownTracker : Window, IDisposable
         var query = timeline.Entries
             .Where(e => e.Enabled && e.TriggerTime > currentTime);
 
-        if (config.CooldownTrackerRoleFilter && Plugin.ClientState?.LocalPlayer != null)
+        if (config.CooldownTrackerRoleFilter && Plugin.ObjectTable?.LocalPlayer != null)
         {
-            var roleId = Plugin.ClientState.LocalPlayer.ClassJob.Value.Role;
+            var roleId = Plugin.ObjectTable.LocalPlayer.ClassJob.Value.Role;
             query = query.Where(e => e.TargetRole == TargetRole.All ||
                 (e.TargetRole == TargetRole.Tank   && roleId == 1) ||
                 (e.TargetRole == TargetRole.Healer && roleId == 4) ||

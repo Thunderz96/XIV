@@ -208,7 +208,8 @@ public sealed class Plugin : IDalamudPlugin
     // =========================================================================
     // TERRITORY CHANGE — Auto-load timelines by duty
     // =========================================================================
-    private void OnTerritoryChanged(ushort territoryTypeId)
+    // 7.5 / API 15: TerritoryChanged delegate is now Action<uint> (was ushort).
+    private void OnTerritoryChanged(uint territoryTypeId)
     {
         if (!Configuration.AutoLoadTimelines) return;
 
@@ -234,7 +235,7 @@ public sealed class Plugin : IDalamudPlugin
             .FirstOrDefault(t => t.Id == Configuration.SelectedTimelineId);
 
     /// <summary>Zone the player is currently in.</summary>
-    public ushort CurrentTerritoryId => ClientState.TerritoryType;
+    public uint CurrentTerritoryId => ClientState.TerritoryType;
 
     private void EnsureTimelineLoaded()
     {

@@ -5,5 +5,5 @@
     "Description": "Show strategy images during combat — triggered by fight timer or boss casts. Supports multiple named strategy variants per fight so you always see the right strat for your group. Use /strat to open. Works great alongside Callout Plugin.",
     "RepoUrl": "https://github.com/Thunderz96/XIV",
     "Tags": [ "strat", "strategy", "overlay", "timeline", "raid", "image", "combat" ],
-    "AssemblyVersion": "1.0.0.0"
+    "AssemblyVersion": "1.0.0.1"
 }

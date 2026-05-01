@@ -13,7 +13,7 @@
     <PackageProjectUrl>https://github.com/Thunderz96/XIV_Plugins</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
-    <DalamudApiLevel>14</DalamudApiLevel>
+    <DalamudApiLevel>15</DalamudApiLevel>
   </PropertyGroup>
 
   <PropertyGroup>

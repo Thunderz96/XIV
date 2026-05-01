@@ -93,6 +93,8 @@ public record struct CurrencyInfo
 public class CurrencyTracker : IDisposable
 {
     private readonly IClientState ClientState;
+    // 7.5 / API 15: LocalPlayer moved from IClientState to IObjectTable.
+    private readonly IObjectTable ObjectTable;
     private readonly IFramework Framework;
     private readonly IPluginLog Log;
 
@@ -284,10 +286,12 @@ public class CurrencyTracker : IDisposable
     public CurrencyTracker(
         IDataManager dataManager,
         IClientState clientState,
+        IObjectTable objectTable,
         IFramework framework,
         IPluginLog log)
     {
         ClientState = clientState;
+        ObjectTable = objectTable;
         Framework = framework;
         Log = log;
 
@@ -307,7 +311,7 @@ public class CurrencyTracker : IDisposable
     // =========================================================================
     private void OnFrameworkUpdate(IFramework framework)
     {
-        if (ClientState.LocalPlayer == null)
+        if (ObjectTable.LocalPlayer == null)
         {
             currencies.Clear();
             return;
